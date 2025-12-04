@@ -1,0 +1,238 @@
+apiVersion: v1
+items:
+- apiVersion: build.openshift.io/v1
+  kind: BuildConfig
+  metadata:
+    labels:
+      application: mlbparks
+      template: mlbparks
+    name: mlbparks
+  spec:
+    output:
+      to:
+        kind: ImageStreamTag
+        name: mlbparks:latest
+    source:
+      git:
+        ref: master
+        uri: https://github.com/gshipley/openshift3mlbparks.git
+      type: Git
+    strategy:
+      sourceStrategy:
+        from:
+          kind: ImageStreamTag
+          name: jboss-eap6-openshift:6.4
+      type: Source
+    triggers:
+    - generic:
+        secret: MuJVrsW8
+      type: Generic
+    - github:
+        secret: R1UwbJ5v
+      type: GitHub
+    - imageChange: {}
+      type: ImageChange
+- apiVersion: image.openshift.io/v1
+  kind: ImageStream
+  metadata:
+    labels:
+      application: mlbparks
+      template: mlbparks
+    name: mlbparks
+  spec:
+    dockerImageRepository: ""
+    tags:
+    - name: latest
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      application: mlbparks
+      template: mlbparks
+    name: mlbparks-mongodb
+  spec:
+    replicas: 1
+    selector:
+      deploymentConfig: mlbparks-mongodb
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          application: mlbparks
+          deploymentConfig: mlbparks-mongodb
+        name: mlbparks-mongodb
+      spec:
+        containers:
+        - env:
+          - name: MONGODB_USER
+            value: userII5
+          - name: MONGODB_PASSWORD
+            value: 6ySQYui0
+          - name: MONGODB_DATABASE
+            value: root
+          - name: MONGODB_ADMIN_PASSWORD
+            value: 3AJ2jQwB
+          - name: MONGODB_NOPREALLOC
+            value: ""
+          - name: MONGODB_SMALLFILES
+            value: ""
+          - name: MONGODB_QUIET
+            value: ""
+          image: mongodb
+          imagePullPolicy: IfNotPresent
+          name: mlbparks-mongodb
+          ports:
+          - containerPort: 27017
+            protocol: TCP
+          resources: {}
+          securityContext:
+            capabilities: {}
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+          volumeMounts:
+          - mountPath: /var/lib/mongodb/data
+            name: mlbparks-mongodb-data
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+        volumes:
+        - emptyDir: {}
+          name: mlbparks-mongodb-data
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - mlbparks-mongodb
+        from:
+          kind: ImageStreamTag
+          name: mongodb:latest
+          namespace: openshift
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: apps.openshift.io/v1
+  kind: DeploymentConfig
+  metadata:
+    labels:
+      application: mlbparks
+      deploymentConfig: mlbparks
+      template: mlbparks
+    name: mlbparks
+  spec:
+    replicas: 1
+    selector:
+      deploymentConfig: mlbparks
+    strategy:
+      type: Recreate
+    template:
+      metadata:
+        labels:
+          application: mlbparks
+          deploymentConfig: mlbparks
+      spec:
+        containers:
+        - env:
+          - name: OPENSHIFT_DNS_PING_SERVICE_NAME
+            value: mlbparks-ping
+          - name: OPENSHIFT_DNS_PING_SERVICE_PORT
+            value: "8888"
+          - name: MONGODB_USER
+            value: userII5
+          - name: MONGODB_PASSWORD
+            value: 6ySQYui0
+          - name: MONGODB_DATABASE
+            value: root
+          - name: MONGODB_ADMIN_PASSWORD
+            value: 3AJ2jQwB
+          image: mlbparks
+          imagePullPolicy: Always
+          name: mlbparks
+          ports:
+          - containerPort: 8080
+            name: mlbparks-http
+            protocol: TCP
+          - containerPort: 8888
+            name: mlbparks-ping
+            protocol: TCP
+          readinessProbe:
+            exec:
+              command:
+              - /bin/bash
+              - -c
+              - /opt/eap/bin/readinessProbe.sh
+          resources: {}
+          securityContext:
+            capabilities: {}
+            privileged: false
+          terminationMessagePath: /dev/termination-log
+        dnsPolicy: ClusterFirst
+        restartPolicy: Always
+    triggers:
+    - imageChangeParams:
+        automatic: true
+        containerNames:
+        - mlbparks
+        from:
+          kind: ImageStreamTag
+          name: mlbparks:latest
+      type: ImageChange
+    - type: ConfigChange
+- apiVersion: route.openshift.io/v1
+  kind: Route
+  metadata:
+    annotations:
+      description: Route for application's http service
+    labels:
+      application: mlbparks
+      template: mlbparks
+    name: mlbparks-http-route
+  spec:
+    host: ""
+    to:
+      kind: Service
+      name: mlbparks-http
+- apiVersion: v1
+  kind: Service
+  metadata:
+    labels:
+      application: mlbparks
+      template: mlbparks
+    name: mongodb
+  spec:
+    ports:
+    - port: 27017
+      targetPort: 27017
+    selector:
+      deploymentConfig: mlbparks-mongodb
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: Ping service for clustered applications
+    labels:
+      application: mlbparks
+      template: mlbparks
+    name: mlbparks-http
+  spec:
+    ports:
+    - port: 8080
+      protocol: TCP
+      targetPort: 8080
+    selector:
+      deploymentConfig: mlbparks
+- apiVersion: v1
+  kind: Service
+  metadata:
+    annotations:
+      description: Ping service for clustered applications
+    labels:
+      application: mlbparks
+      template: mlbparks
+    name: mlbparks-ping
+  spec:
+    ports:
+    - port: 8888
+      targetPort: 8888
+    selector:
+      deploymentConfig: mlbparks
+kind: List
+metadata: {}
